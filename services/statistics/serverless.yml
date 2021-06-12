@@ -1,0 +1,68 @@
+org: audienceserv
+app: ses-stats
+service: ses-stats-statistics
+
+frameworkVersion: '2'
+variablesResolutionMode: 20210326
+
+patterns:
+  - '!node_modules/**'
+
+plugins:
+  - serverless-prune-plugin
+  - serverless-python-requirements
+
+custom:
+  prune:
+    automatic: true
+    number: 5
+  pythonRequirements:
+    dockerizePip: true  # Because of lxml
+
+provider:
+  name: aws
+  lambdaHashingVersion: '20201221'
+  eventBridge:
+    useCloudFormation: true
+  profile: AudienceServAWS
+  runtime: python3.8
+  stage: ${opt:stage, 'dev'}
+  region: eu-west-1
+  tracing:
+    apiGateway: true
+    lambda: true
+  vpc:
+    subnetIds:
+      - "subnet-016fd7e4fb8d73fbd"
+      - "subnet-0a4f03eb9efe1e1f6"
+      - "subnet-0d399b50fceccbc9c"
+    securityGroupIds:
+      - "sg-068897276d41ca309"
+  environment:
+    STAGE: '${sls:stage}'
+  iam:
+    role:
+      statements:
+#        - Effect: "Allow"
+#          Action:
+#            - "dynamodb:Query"
+#            - "dynamodb:GetItem"
+#            - "dynamodb:GetRecords"
+#            - "dynamodb:PutItem"
+#            - "dynamodb:UpdateItem"
+#            - "dynamodb:DescribeTable"
+#          Resource:
+#            - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${ssm:/leadGen/${sls:stage}/dynamodb_table_name}"
+#            - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${ssm:/leadGen/${sls:stage}/dynamodb_table_name}/*"
+        - Effect: "Allow"
+          Action:
+            - "sqs:DeleteMessageBatch"
+          Resource:
+            - "${ssm:/sesStats/${sls:stage}/event_queue_arn}"
+
+functions:
+  indexSesEvents:
+    handler: src/handlers/process_events.handler
+    events:
+      - sqs:
+          arn: "${ssm:/sesStats/${sls:stage}/event_queue_arn}"
